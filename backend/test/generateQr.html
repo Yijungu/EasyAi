@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Teacher Login and QR Code Generation</title>
+  </head>
+  <body>
+    <h1>Teacher Login and QR Code Generation</h1>
+    <div>
+      <label for="teacherEmail">Teacher Email: </label>
+      <input
+        type="email"
+        id="teacherEmail"
+        placeholder="Enter Teacher Email"
+        value="teacher@example.com"
+      />
+    </div>
+    <button id="teacherLogin">Login and Generate QR Codes</button>
+    <div id="qrCodes" style="display: none">
+      <h2>Generated QR Codes</h2>
+      <div>
+        <h3>QR Code 1</h3>
+        <img id="qrCode1" alt="QR Code 1" />
+        <p style="width: 1000px" id="qrCodeText1"></p>
+      </div>
+      <div>
+        <h3>QR Code 2</h3>
+        <img id="qrCode2" alt="QR Code 2" />
+        <p id="qrCodeText2"></p>
+      </div>
+    </div>
+    <div id="status"></div>
+    <div id="modeSettings" style="display: none">
+      <h2>Set Mode</h2>
+      <label for="mode">Select Mode: </label>
+      <select id="mode">
+        <option value="personal">Personal</option>
+        <option value="team">Team</option>
+        <option value="teacher">Teacher</option>
+      </select>
+      <button id="setMode">Set Mode</button>
+    </div>
+    <div id="teamSettings" style="display: none">
+      <h2>Create Teams</h2>
+      <div>
+        <label for="teamName1">Team Name 1: </label>
+        <input type="text" id="teamName1" placeholder="Enter Team Name 1" />
+        <label for="teamMembers1">Team Members 1 (comma separated): </label>
+        <input
+          type="text"
+          id="teamMembers1"
+          placeholder="Enter Team Members 1"
+        />
+      </div>
+      <div>
+        <label for="teamName2">Team Name 2: </label>
+        <input type="text" id="teamName2" placeholder="Enter Team Name 2" />
+        <label for="teamMembers2">Team Members 2 (comma separated): </label>
+        <input
+          type="text"
+          id="teamMembers2"
+          placeholder="Enter Team Members 2"
+        />
+      </div>
+      <button id="createTeams">Create Teams</button>
+    </div>
+    <video id="localVideo" autoplay muted style="display: none"></video>
+    <canvas id="canvas" style="display: none"></canvas>
+    <img
+      id="sharedScreen"
+      alt="Shared Screen"
+      style="width: 100%; border: 1px solid black"
+    />
+
+    <script>
+      let teacherWs;
+      document.getElementById("teacherLogin").onclick = async () => {
+        const email = document.getElementById("teacherEmail").value;
+        try {
+          // Login and generate QR codes
+          const response = await fetch("http://localhost:3000/api/auth/login", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ email }),
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            document.getElementById(
+              "status"
+            ).innerText = `Login successful. Affiliation: ${data.affiliation}`;
+
+            // Generate QR codes
+            const qrResponse = await fetch(
+              "http://localhost:3000/api/qr/generate",
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  schoolId: data.affiliation,
+                  userId: email,
+                }),
+              }
+            );
+
+            if (qrResponse.ok) {
+              const qrData = await qrResponse.json();
+              document.getElementById("qrCode1").src = qrData.qrCode1;
+              document.getElementById("qrCode2").src = qrData.qrCode2;
+              document.getElementById("qrCodeText1").innerText = qrData.qrCode1;
+              document.getElementById("qrCodeText2").innerText = qrData.qrCode2;
+              document.getElementById("qrCodes").style.display = "block";
+              document.getElementById("status").innerText =
+                "QR codes generated successfully";
+              document.getElementById("modeSettings").style.display = "block";
+              document.getElementById("teamSettings").style.display = "block";
+
+              // Open WebSocket connection
+              teacherWs = new WebSocket(
+                `ws://localhost:3000/ws/${data.affiliation}/${"teacher"}`
+              );
+              teacherWs.onopen = () => {
+                document.getElementById("status").innerText =
+                  "WebSocket connection established for teacher";
+              };
+              teacherWs.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                document.getElementById(
+                  "status"
+                ).innerText = `Received message: ${JSON.stringify(data)}`;
+                if (data.type === "mode") {
+                  document.getElementById(
+                    "status"
+                  ).innerText = `Mode set to ${data.mode}`;
+                  if (data.sharing) {
+                    startScreenSharing(data.targetId);
+                  }
+                }
+              };
+              teacherWs.onclose = () => {
+                document.getElementById("status").innerText =
+                  "WebSocket connection closed for teacher";
+              };
+              teacherWs.onerror = (error) => {
+                document.getElementById(
+                  "status"
+                ).innerText = `WebSocket error: ${error.message}`;
+              };
+            } else {
+              const errorText = await qrResponse.text();
+              document.getElementById(
+                "status"
+              ).innerText = `Error generating QR codes: ${errorText}`;
+            }
+          } else {
+            const errorText = await response.text();
+            document.getElementById(
+              "status"
+            ).innerText = `Login error: ${errorText}`;
+          }
+        } catch (error) {
+          console.error("Fetch error:", error);
+          document.getElementById(
+            "status"
+          ).innerText = `Fetch error: ${error.message}`;
+        }
+      };
+
+      document.getElementById("setMode").onclick = () => {
+        const mode = document.getElementById("mode").value;
+        teacherWs.send(JSON.stringify({ type: "setMode", mode }));
+      };
+
+      document.getElementById("createTeams").onclick = () => {
+        const teams = [
+          {
+            teamName: document.getElementById("teamName1").value,
+            teamMembers: document
+              .getElementById("teamMembers1")
+              .value.split(","),
+          },
+          // {
+          //   teamName: document.getElementById("teamName2").value,
+          //   teamMembers: document
+          //     .getElementById("teamMembers2")
+          //     .value.split(","),
+          // },
+        ];
+
+        teacherWs.send(
+          JSON.stringify({
+            type: "createTeam",
+            teams,
+          })
+        );
+      };
+
+      function startScreenSharing(targetId) {
+        navigator.mediaDevices
+          .getDisplayMedia({ video: true })
+          .then((stream) => {
+            const videoTrack = stream.getVideoTracks()[0];
+            const imageCapture = new ImageCapture(videoTrack);
+
+            setInterval(async () => {
+              const bitmap = await imageCapture.grabFrame();
+              const canvas = document.createElement("canvas");
+              const context = canvas.getContext("2d");
+              canvas.width = bitmap.width;
+              canvas.height = bitmap.height;
+              context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+              const dataUrl = canvas.toDataURL("image/png");
+              teacherWs.send(
+                JSON.stringify({
+                  type: "shareScreen",
+                  image: dataUrl,
+                  targetType: targetId,
+                })
+              );
+            }, 1000);
+          })
+          .catch((error) => {
+            console.error("Error starting screen share:", error);
+            document.getElementById(
+              "status"
+            ).innerText = `Error starting screen share: ${error.message}`;
+          });
+      }
+    </script>
+  </body>
+</html>

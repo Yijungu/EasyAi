@@ -1,0 +1,1 @@
+stable-diffusion-xl-beta-v2-2-2

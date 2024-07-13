@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>WebSocket Screen Sharing Test</title>
+  </head>
+  <body>
+    <h1>WebSocket Screen Sharing Test</h1>
+    <div>
+      <label for="schoolId">School ID: </label>
+      <input
+        type="text"
+        id="schoolId"
+        placeholder="Enter School ID"
+        value="schoolA"
+      />
+    </div>
+    <div>
+      <label for="userId">User ID: </label>
+      <input type="text" id="userId" placeholder="Enter your User ID" />
+    </div>
+    <div>
+      <label for="targetType">Target Type: </label>
+      <select id="targetType">
+        <option value="everyone">Everyone</option>
+        <option value="teacherAndOthers">Teacher and Others</option>
+        <option value="specific">Specific Users</option>
+        <option value="team">Team</option>
+      </select>
+    </div>
+    <div id="specificUsers" style="display: none">
+      <label for="targetIds">Target IDs (comma separated): </label>
+      <input type="text" id="targetIds" placeholder="Enter target IDs" />
+    </div>
+    <div id="team" style="display: none">
+      <label for="teamId">Team ID: </label>
+      <input type="text" id="teamId" placeholder="Enter team ID" />
+    </div>
+    <button id="connect">Connect</button>
+    <button id="createTeam">Create Team</button>
+    <button id="joinTeam">Join Team</button>
+    <button id="leaveTeam">Leave Team</button>
+    <button id="shareScreen">Share Screen</button>
+    <button id="stopShareScreen">Stop Sharing Screen</button>
+    <div id="status"></div>
+    <video id="localVideo" autoplay muted style="display: none"></video>
+    <canvas id="canvas" style="display: none"></canvas>
+    <img
+      id="sharedScreen"
+      alt="Shared Screen"
+      style="width: 100%; border: 1px solid black"
+    />
+
+    <script>
+      let ws;
+      let localStream;
+      const canvas = document.getElementById("canvas");
+      const context = canvas.getContext("2d");
+      const sharedScreen = document.getElementById("sharedScreen");
+
+      document.getElementById("targetType").onchange = (event) => {
+        const specificUsers = document.getElementById("specificUsers");
+        const team = document.getElementById("team");
+        if (event.target.value === "specific") {
+          specificUsers.style.display = "block";
+          team.style.display = "none";
+        } else if (event.target.value === "team") {
+          team.style.display = "block";
+          specificUsers.style.display = "none";
+        } else {
+          specificUsers.style.display = "none";
+          team.style.display = "none";
+        }
+      };
+
+      document.getElementById("connect").onclick = () => {
+        const schoolId = document.getElementById("schoolId").value;
+        const userId = document.getElementById("userId").value;
+        ws = new WebSocket(`ws://localhost:3000/ws/${schoolId}/${userId}`);
+
+        ws.onopen = () => {
+          document.getElementById("status").innerText =
+            "Connected to WebSocket server";
+        };
+
+        ws.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+
+          if (data.type === "screenShare") {
+            sharedScreen.src = data.image;
+          } else if (data.type === "stopScreenShare") {
+            sharedScreen.src = "";
+          }
+          document.getElementById(
+            "status"
+          ).innerText = `Received message: ${JSON.stringify(data)}`;
+        };
+
+        ws.onclose = () => {
+          document.getElementById("status").innerText =
+            "Disconnected from WebSocket server";
+        };
+
+        ws.onerror = (error) => {
+          document.getElementById(
+            "status"
+          ).innerText = `WebSocket error: ${error}`;
+        };
+      };
+
+      document.getElementById("createTeam").onclick = () => {
+        const teamId = document.getElementById("teamId").value;
+        ws.send(JSON.stringify({ type: "createTeam", teamId }));
+      };
+
+      document.getElementById("joinTeam").onclick = () => {
+        const teamId = document.getElementById("teamId").value;
+        ws.send(JSON.stringify({ type: "joinTeam", teamId }));
+      };
+
+      document.getElementById("leaveTeam").onclick = () => {
+        const teamId = document.getElementById("teamId").value;
+        ws.send(JSON.stringify({ type: "leaveTeam", teamId }));
+      };
+
+      document.getElementById("shareScreen").onclick = async () => {
+        const targetType = document.getElementById("targetType").value;
+        const targetIds =
+          targetType === "specific"
+            ? document.getElementById("targetIds").value.split(",")
+            : [];
+        const teamId =
+          targetType === "team" ? document.getElementById("teamId").value : "";
+
+        localStream = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+        });
+        const videoElement = document.getElementById("localVideo");
+        videoElement.srcObject = localStream;
+        videoElement.style.display = "block";
+
+        const [track] = localStream.getVideoTracks();
+        const imageCapture = new ImageCapture(track);
+
+        setInterval(async () => {
+          const bitmap = await imageCapture.grabFrame();
+          canvas.width = bitmap.width;
+          canvas.height = bitmap.height;
+          context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL("image/png");
+          ws.send(
+            JSON.stringify({
+              type: "shareScreen",
+              image: dataUrl,
+              targetType,
+              targetIds,
+              teamId,
+            })
+          );
+        }, 1000);
+      };
+
+      document.getElementById("stopShareScreen").onclick = () => {
+        const targetType = document.getElementById("targetType").value;
+        const targetIds =
+          targetType === "specific"
+            ? document.getElementById("targetIds").value.split(",")
+            : [];
+        const teamId =
+          targetType === "team" ? document.getElementById("teamId").value : "";
+
+        ws.send(
+          JSON.stringify({
+            type: "stopScreenShare",
+            targetType,
+            targetIds,
+            teamId,
+          })
+        );
+
+        // Stop local screen sharing
+        if (localStream) {
+          localStream.getTracks().forEach((track) => track.stop());
+          const videoElement = document.getElementById("localVideo");
+          videoElement.style.display = "none";
+        }
+      };
+    </script>
+  </body>
+</html>

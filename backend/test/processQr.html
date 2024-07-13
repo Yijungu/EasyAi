@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>QR Code Processing Test</title>
+  </head>
+  <body>
+    <h1>QR Code Processing Test</h1>
+    <div>
+      <label for="nickname">Nickname: </label>
+      <input type="text" id="nickname" placeholder="Enter your Nickname" />
+    </div>
+    <div>
+      <label for="qrCode">QR Code URL: </label>
+      <input type="text" id="qrCode" placeholder="Enter your QR Code URL" />
+    </div>
+    <button id="process">Process QR Code</button>
+    <div id="status"></div>
+    <video id="localVideo" autoplay muted style="display: none"></video>
+    <canvas id="canvas" style="display: none"></canvas>
+    <img
+      id="sharedScreen"
+      alt="Shared Screen"
+      style="width: 100%; border: 1px solid black"
+    />
+
+    <script>
+      let childWs;
+      document.getElementById("process").onclick = async () => {
+        const qrCode = document.getElementById("qrCode").value;
+        const nickname = document.getElementById("nickname").value;
+
+        try {
+          const response = await fetch("http://localhost:3000/api/qr/process", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ qrCode, nickname }),
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            document.getElementById(
+              "status"
+            ).innerText = `User added to school ${data.schoolId}. Is first QR Code: ${data.isFirstQRCode}`;
+
+            // Open WebSocket connection
+            childWs = new WebSocket(
+              `ws://localhost:3000/ws/${data.schoolId}/${nickname}`
+            );
+            childWs.onopen = () => {
+              document.getElementById("status").innerText =
+                "WebSocket connection established for child";
+            };
+            childWs.onmessage = (event) => {
+              const data = JSON.parse(event.data);
+              document.getElementById(
+                "status"
+              ).innerText = `Received message: ${JSON.stringify(data)}`;
+              if (data.type === "screenShare") {
+                document.getElementById("sharedScreen").src = data.image;
+              } else if (data.type === "stopScreenShare") {
+                document.getElementById("sharedScreen").src = "";
+              } else if (data.type === "mode") {
+                document.getElementById(
+                  "status"
+                ).innerText = `Mode set to ${data.mode}`;
+                if (data.sharing) {
+                  console.log(data.targetId);
+                  startScreenSharing(data.targetId);
+                }
+              }
+            };
+            childWs.onclose = () => {
+              document.getElementById("status").innerText =
+                "WebSocket connection closed for child";
+            };
+            childWs.onerror = (error) => {
+              document.getElementById(
+                "status"
+              ).innerText = `WebSocket error: ${error.message}`;
+            };
+          } else {
+            const errorText = await response.text();
+            document.getElementById(
+              "status"
+            ).innerText = `Error processing QR Code: ${errorText}`;
+          }
+        } catch (error) {
+          console.error("Fetch error:", error);
+          document.getElementById(
+            "status"
+          ).innerText = `Fetch error: ${error.message}`;
+        }
+      };
+
+      function startScreenSharing(targetId) {
+        const nickname = document.getElementById("nickname").value;
+        navigator.mediaDevices
+          .getDisplayMedia({ video: true })
+          .then((stream) => {
+            const videoTrack = stream.getVideoTracks()[0];
+            const imageCapture = new ImageCapture(videoTrack);
+
+            setInterval(async () => {
+              const bitmap = await imageCapture.grabFrame();
+              const canvas = document.createElement("canvas");
+              const context = canvas.getContext("2d");
+              canvas.width = bitmap.width;
+              canvas.height = bitmap.height;
+              context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+              const dataUrl = canvas.toDataURL("image/png");
+              childWs.send(
+                JSON.stringify({
+                  type: "shareScreen",
+                  image: dataUrl,
+                  targetType: targetId,
+                })
+              );
+            }, 1000);
+          })
+          .catch((error) => {
+            console.error("Error starting screen share:", error);
+            document.getElementById(
+              "status"
+            ).innerText = `Error starting screen share: ${error.message}`;
+          });
+      }
+    </script>
+  </body>
+</html>
