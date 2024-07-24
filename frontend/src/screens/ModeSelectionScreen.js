@@ -1,14 +1,26 @@
-import React from 'react';
+import React, {useState} from 'react';
 import {View, Text, StyleSheet, TouchableOpacity} from 'react-native';
 import {useWebSocket} from '../contexts/WebSocketContext';
 import LogoLeftTop from '../components/LogoLeftTop';
 import Title from '../components/Title';
+import TeamModal from '../components/Team/TeamModal';
 
 const ModeSelectionScreen = ({navigation}) => {
   const {setMode} = useWebSocket();
+  const [teamModalVisible, setTeamModalVisible] = useState(false); // useState 사용 방법 수정
 
   const handleSetMode = mode => {
-    setMode(mode);
+    if (mode === 'team') {
+      setTeamModalVisible(true);
+    } else {
+      setMode(mode);
+    }
+  };
+
+  const teamSet = teams => {
+    setMode('team', teams);
+    console.log(teams);
+    setTeamModalVisible(false);
   };
 
   return (
@@ -32,6 +44,11 @@ const ModeSelectionScreen = ({navigation}) => {
           <Text style={styles.buttonText}>스스로</Text>
         </TouchableOpacity>
       </View>
+      <TeamModal
+        isVisible={teamModalVisible}
+        onClose={() => setTeamModalVisible(false)}
+        onFinish={teamSet}
+      />
       <TouchableOpacity
         style={styles.backButton}
         onPress={() => navigation.goBack()}>

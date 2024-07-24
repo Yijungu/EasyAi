@@ -1,4 +1,3 @@
-// backend/controllers/wsController.js
 const memory = require("../utils/memory");
 const { joinTeam, leaveTeam, createTeam } = require("../services/teamService");
 const {
@@ -12,14 +11,13 @@ exports.handleConnection = (ws, request) => {
   const schoolId = urlParts[2];
   const userNickName = urlParts[3];
   const school = memory[schoolId];
-
+  console.log(memory);
   if (!school) {
     console.error(`School with ID ${schoolId} not found in memory.`);
     ws.close();
     return;
   }
   let user = school.users.find((user) => user.nickname == userNickName);
-
   user.websocket = ws;
 
   ws.on("message", (message) => {
@@ -39,8 +37,10 @@ exports.handleConnection = (ws, request) => {
 
 exports.handleMessage = (school, userId, data) => {
   switch (data.type) {
+    case "setModeAndTeams":
+      setModeAndTeams(school, data.mode, data.teams);
     case "setMode":
-      setMode(school, data.mode);
+      setMode(school, data.mode, data.newUsers);
       break;
     case "createTeam":
       createTeam(school, data.teams);
@@ -52,33 +52,126 @@ exports.handleMessage = (school, userId, data) => {
       leaveTeam(school, userId, data.teamId);
       break;
     case "offer":
-    case "answer":
-    case "candidate":
-      sendToUser(school, data.targetType, data);
+      handleOffer(school, userId, data);
       break;
-    case "shareScreen":
+    case "answer":
+      handleAnswer(school, userId, data);
+      break;
+    case "candidate":
+      handleCandidate(school, userId, data);
+      break;
+    case "startScreenSharing":
       handleShareScreen(school, userId, data);
       break;
+    case "stopScreenShareSender":
+      handleStopShareScreenSender(school, userId, data);
+      break;
+    case "stopScreenShareCompleted":
+      handleStopShareScreenSenderCompleted(school, userId, data);
     case "stopShareScreen":
       handleStopShareScreen(school, userId, data);
       break;
-    default:
+    case "completed":
+      handleCompleted(school, userId, data);
+      break;
+      console.error(`Unknown message type: ${data.type}`);
       break;
   }
 };
 
 exports.handleClose = (school, userId) => {
-  const index = school.users.findIndex((u) => u.id == userId);
-  if (index !== -1) {
-    school.users[index].websocket = null;
+  // 해당 사용자를 찾는다
+  const userIndex = school.users.findIndex((user) => user.id === userId);
+
+  if (userIndex !== -1) {
+    // 사용자의 웹소켓을 null로 설정하여 연결을 끊는다
+    school.users[userIndex].websocket = null;
+    school.users[userIndex].start = false;
+    // 사용자를 모든 팀에서 제거
+    Object.keys(school.teams).forEach((teamId) => {
+      leaveTeam(school, userId, teamId);
+    });
+
+    const message = {
+      type: "userDisconnected",
+      userId,
+    };
+
+    // 유효한 웹소켓을 가진 사용자가 하나도 없으면 해당 학교를 메모리에서 삭제
+    const allUsersDisconnected = school.users.every(
+      (user) => user.websocket === null
+    );
+
+    if (allUsersDisconnected) {
+      delete memory[school];
+    } else {
+      // 유효한 웹소켓을 가진 사용자에게만 메시지를 전송
+      broadcastMessage(school, message);
+    }
+    console.log("memory : ", memory);
+  } else {
+    console.error(`User with ID ${userId} not found in school.`);
   }
-  Object.keys(school.teams).forEach((teamId) =>
-    leaveTeam(school, userId, teamId)
-  );
 };
 
-function setMode(school, mode) {
+function setModeAndTeams(school, mode, teams) {
+  if (mode === "team") {
+    createTeam(school, teams);
+
+    teams.forEach((team) => {
+      if (team.members.length > 0) {
+        const teamLeader = team.members[0];
+        team.leaderId = teamLeader.id;
+
+        let teamMemberIds = [];
+        team.members.forEach((member, index) => {
+          if (index === 0) {
+            member.screenOwner = "selfScreen";
+            const targetIds = team.members.slice(1).map((m) => m.id); // 자신을 제외한 팀원들의 ID
+            const sharing = targetIds.length > 0; // targetIds의 개수가 0개면 false, 그렇지 않으면 true
+            member.start = !sharing;
+            member.state = "personal";
+            sendToUser(school, member.id, {
+              type: "mode",
+              state: "personal",
+              sharing: sharing,
+              targetIds: targetIds,
+              mode,
+            });
+          } else {
+            member.screenOwner = teamLeader.id;
+            member.start = true;
+            member.state = "shared";
+            sendToUser(school, member.id, {
+              type: "mode",
+              state: "shared",
+              sharing: false,
+              mode,
+            });
+            teamMemberIds.push(member.id);
+          }
+        });
+      }
+    });
+
+    const teacher = school.users.find((user) => user.nickname === "teacher");
+    if (teacher) {
+      teacher.start = true;
+      teacher.state = "manage";
+      sendToUser(school, teacher.id, {
+        type: "mode",
+        state: "manage",
+        sharing: false,
+        mode,
+        teams,
+      });
+    }
+  }
+}
+
+function setMode(school, mode, newUsers) {
   school.currentMode = mode;
+  let targetIds = [];
 
   if (mode === "personal") {
     const teacher = school.users.find((user) => user.nickname === "teacher");
@@ -86,17 +179,23 @@ function setMode(school, mode) {
     school.users.forEach((user) => {
       if (user.nickname !== "teacher") {
         user.screenOwner = "selfScreen";
+        user.start = true;
+        user.state = "personal";
         sendToUser(school, user.id, {
           type: "mode",
-          mode: "personal",
+          state: "personal",
           sharing: false,
+          mode,
         });
+        targetIds.push(user.id);
       }
     });
     if (teacher) {
+      teacher.start = true;
+      teacher.state = "manage";
       sendToUser(school, teacher.id, {
         type: "mode",
-        mode: "manage",
+        state: "manage",
         sharing: false,
         users: school.users
           .filter((user) => user.nickname !== "teacher")
@@ -104,89 +203,124 @@ function setMode(school, mode) {
             id: user.id,
             nickname: user.nickname,
           })),
+        mode,
+        newUsers,
       });
     }
-  } else if (mode === "team") {
-    school.teams.forEach((team) => {
-      const teamLeader = school.users.find((user) => user.id === team.leaderId);
-      team.members.forEach((memberId) => {
-        const member = school.users.find((user) => user.id === memberId);
-        if (member) {
-          member.screenOwner = team.leaderId;
-          sendToUser(school, member.id, {
-            type: "mode",
-            mode: "shared",
-            sharing: false,
-          });
-        }
-      });
-      if (teamLeader) {
-        teamLeader.screenOwner = "selfScreen";
-        sendToUser(school, teamLeader.id, {
-          type: "mode",
-          mode: "personal",
-          sharing: true,
-          targetId: "team",
-        });
-      }
-    });
-    const teacher = school.users.find((user) => user.nickname === "teacher");
-    if (teacher) {
-      sendToUser(school, teacher.id, {
-        type: "mode",
-        mode: "manage",
-        sharing: false,
-        teams: school.teams,
-      });
-    }
+    setTimeout(() => {
+      sendStartSignalToAllUsers(school);
+    }, 2000);
   } else if (mode === "teacher") {
     const teacher = school.users.find((user) => user.nickname === "teacher");
     if (teacher) {
-      sendToUser(school, teacher.id, {
-        type: "mode",
-        mode: "personal",
-        sharing: true,
-        targetId: "everyone",
-      });
       school.users.forEach((user) => {
         if (user.id !== teacher.id) {
+          user.start = true;
           user.screenOwner = "teacher";
+          user.state = "shared";
           sendToUser(school, user.id, {
             type: "mode",
-            mode: "shared",
+            state: "shared",
             sharing: false,
+            mode,
           });
+          targetIds.push(user.id);
         }
+      });
+      teacher.start = false;
+      teacher.state = "personal";
+      sendToUser(school, teacher.id, {
+        type: "mode",
+        state: "personal",
+        sharing: true,
+        targetId: "everyone",
+        targetIds,
+        mode,
       });
     }
   }
+
+  return targetIds; // Returning targetIds for further use
+}
+
+function handleOffer(school, userId, data) {
+  const message = {
+    type: "offer",
+    offer: data.offer,
+    from: userId,
+  };
+  sendToUser(school, data.targetType, message);
+}
+
+function handleAnswer(school, userId, data) {
+  const message = {
+    type: "answer",
+    answer: data.answer,
+    from: userId,
+  };
+  sendToUser(school, data.targetType, message);
+}
+
+function handleCompleted(school, userId) {
+  // 해당 유저의 start 속성을 true로 설정
+
+  const user = school.users.find((user) => user.id === userId);
+  if (user) {
+    user.start = true;
+  }
+  console.log(school.users);
+  // 해당 학교의 모든 유저의 start 속성이 true인지 확인
+  const allStarted = school.users.every((user) => user.start === true);
+
+  // 모든 유저의 start 속성이 true이면 신호 보내기
+  if (allStarted) {
+    sendStartSignalToAllUsers(school);
+  }
+}
+
+function sendStartSignalToAllUsers(school) {
+  school.users.forEach((user) => {
+    const message = {
+      type: "completed",
+      state: user.state,
+    };
+    sendToUser(school, user.id, message);
+  });
+}
+
+function handleCandidate(school, userId, data) {
+  const message = {
+    type: "candidate",
+    candidate: data.candidate,
+    from: userId,
+  };
+  sendToUser(school, data.targetType, message);
 }
 
 function handleShareScreen(school, userId, data) {
   const message = {
-    type: "screenShare",
-    image: data.image,
+    type: "startScreenSharing",
     from: userId,
   };
-  if (data.targetType === "everyone") {
-    broadcastMessage(school, message, [userId]);
-  } else if (data.targetType === "teacherAndOthers") {
-    const targets = school.users
-      .filter((user) => user.id !== userId && user.nickname !== "teacher")
-      .map((user) => user.id);
-    broadcastMessage(school, message, targets);
-  } else if (data.targetType === "specific") {
-    const targets = data.targetType;
-    broadcastMessageIn(school, message, targets);
-  } else if (data.targetType === "team") {
-    team_user = school.users.find((user) => user.id == userId);
-    const teamId = team_user.teamId;
-    const teamMembers = school.teams[teamId - 1].members || [];
-    const targets = teamMembers.filter((id) => id !== userId);
-    console.log("teamMembers : ", teamMembers);
-    console.log("targets : ", targets);
-    broadcastMessageIn(school, message, targets);
-  }
+  sendToUser(school, data.targetType, message);
+}
+
+function handleStopShareScreenSender(school, userId, data) {
+  const message = {
+    type: "stopScreenShareSender",
+    newUserId: data.newUserId,
+    from: userId,
+  };
+  sendToUser(school, data.targetType, message);
+}
+
+function handleStopShareScreenSenderCompleted(school, userId, data) {
+  const message = {
+    type: "stopScreenShareSenderCompleted",
+    newUserId: data.newUserId,
+    from: userId,
+  };
+  sendToUser(school, data.targetType, message);
 }
 
 function handleStopShareScreen(school, userId, data) {
@@ -195,20 +329,5 @@ function handleStopShareScreen(school, userId, data) {
     from: userId,
   };
 
-  if (data.targetType === "everyone") {
-    broadcastMessage(school, message, [userId]);
-  } else if (data.targetType === "teacherAndOthers") {
-    const targets = school.users
-      .filter((user) => user.id !== userId && user.nickname !== "teacher")
-      .map((user) => user.id);
-    broadcastMessage(school, message, targets);
-  } else if (data.targetType === "specific") {
-    const targets = data.targetIds;
-    broadcastMessage(school, message, targets);
-  } else if (data.targetType === "team") {
-    const teamId = data.teamId;
-    const teamMembers = school.teams[teamId] || [];
-    const targets = teamMembers.filter((id) => id !== userId);
-    broadcastMessage(school, message, targets);
-  }
+  sendToUser(school, data.targetId, message);
 }

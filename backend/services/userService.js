@@ -2,6 +2,10 @@ const WebSocket = require("ws");
 
 function sendToUser(school, targetId, message) {
   const targetUser = school.users.find((user) => user.id == targetId);
+  // console.log(message.type, targetId);
+  // console.log(school.users);
+  // console.log("targetUser: ", targetUser.nickname, targetUser.id);
+
   if (
     targetUser &&
     targetUser.websocket &&

@@ -6,12 +6,14 @@ import {useWebSocket} from '../contexts/WebSocketContext';
 
 const TeacherLoginScreen = ({navigation}) => {
   const [email, setEmail] = useState('teacher@example.com');
-  const {setAffiliation} = useWebSocket();
+  const {setNewUsers, setAffiliation, setNickname} = useWebSocket();
 
   const handleLogin = async () => {
     try {
+      setNickname('teacher');
       const data = await login(email);
       setAffiliation(data.affiliation);
+      setNewUsers(data.newUsers);
       navigation.navigate('Main', {email, affiliation: data.affiliation});
     } catch (error) {
       alert('Login failed. Please try again.');

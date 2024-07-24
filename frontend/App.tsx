@@ -1,14 +1,14 @@
 import 'react-native-gesture-handler';
-import React from 'react';
-import {WebSocketProvider} from './src/contexts/WebSocketContext';
+import React, {useEffect} from 'react';
 import AppNavigator from './src/navigator/AppNavigator';
+import requestPermissionsAndStartService from './src/services/PermissionsService';
 
 const App = () => {
-  return (
-    <WebSocketProvider>
-      <AppNavigator />
-    </WebSocketProvider>
-  );
+  useEffect(() => {
+    requestPermissionsAndStartService();
+  }, []);
+
+  return <AppNavigator />;
 };
 
 export default App;

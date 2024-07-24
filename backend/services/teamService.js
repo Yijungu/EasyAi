@@ -7,7 +7,9 @@ function joinTeam(school, userId, teamId) {
 
 function leaveTeam(school, userId, teamId) {
   if (school.teams[teamId]) {
-    school.teams[teamId] = school.teams[teamId].filter((id) => id !== userId);
+    school.teams[teamId] = school.teams[teamId].filter(
+      (user) => user.id !== userId
+    );
     if (school.teams[teamId].length === 0) {
       delete school.teams[teamId];
     }
@@ -20,12 +22,11 @@ const createTeam = (school, teams) => {
   }
   teams.forEach((team) => {
     const teamId = school.teams.length + 1;
-    const leader = school.users.find(
-      (user) => user.nickname === team.teamMembers[0]
-    );
-    const memberIds = team.teamMembers
-      .map((nickname) => {
-        const member = school.users.find((user) => user.nickname === nickname);
+    console.log(team.members);
+    const leader = school.users.find((user) => user.id === team.members[0].id);
+    const memberIds = team.members
+      .map((tempMember) => {
+        const member = school.users.find((user) => user.id === tempMember.id);
         return member ? member.id : null;
       })
       .filter((id) => id !== null);
@@ -44,8 +45,8 @@ const createTeam = (school, teams) => {
       members: memberIds, // Store members' IDs
     });
 
-    memberIds.forEach((memberId) => {
-      const user = school.users.find((user) => user.id === memberId);
+    memberIds.forEach((id) => {
+      const user = school.users.find((user) => user.id === id);
       if (user) {
         user.teamId = teamId;
       }

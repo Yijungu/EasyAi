@@ -14,7 +14,7 @@ import Title from '../components/Title';
 
 const MainScreen = ({route, navigation}) => {
   const {email, affiliation} = route.params;
-  const {setAffiliation, qrCodes, setQrCodes} = useWebSocket();
+  const {setAffiliation, qrCodes, setQrCodes, newUsers} = useWebSocket();
   const [showQrCode, setShowQrCode] = useState(false);
 
   useEffect(() => {
@@ -71,6 +71,11 @@ const MainScreen = ({route, navigation}) => {
             onPress={handleNavigateToMode}>
             <Text style={styles.buttonText}>Select Mode</Text>
           </TouchableOpacity>
+          <View style={styles.newUserShowBox}>
+            {newUsers.map((user, index) => (
+              <Text key={index}>{user.nickname}</Text>
+            ))}
+          </View>
         </>
       )}
     </View>
@@ -127,6 +132,15 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 30,
     bottom: 30,
+  },
+  newUserShowBox: {
+    position: 'absolute',
+    width: 200,
+    height: 250,
+    right: 80,
+    bottom: 90,
+    backgroundColor: '#FFF',
+    borderRadius: 10,
   },
 });
 

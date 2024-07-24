@@ -8,7 +8,7 @@ const Title = ({children}) => {
 const styles = StyleSheet.create({
   title: {
     position: 'absolute',
-    top: 80,
+    top: 55,
     fontSize: 40,
     marginBottom: 300,
     fontWeight: 'bold',

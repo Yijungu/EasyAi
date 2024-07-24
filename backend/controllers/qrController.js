@@ -17,39 +17,23 @@ exports.generateQRCodes = async (req, res) => {
         .send(`School with ID ${schoolId} not found in memory.`);
     }
 
-    let user = school.users.find((user) => user.id == userId);
-
-    if (!user) {
-      user = {
-        id: uuidv4(),
-        nickname: "teacher",
-        websocket: "",
-        isPaused: false,
-        screenOwner: "selfScreen",
-      };
-      school.users.push(user);
-    }
-
-    const qrCodeData1 = `https://example.com/user/${user.id}/qr1`;
-    const qrCodeData2 = `https://example.com/user/${user.id}/qr2`;
+    const qrCodeData1 = `https://example.com/user/${schoolId}/qr1`;
+    const qrCodeData2 = `https://example.com/user/${schoolId}/qr2`;
 
     const qrCode1 = await QRCode.toDataURL(qrCodeData1);
     const qrCode2 = await QRCode.toDataURL(qrCodeData2);
+    const tempQr = "1";
 
-    if (!school.qrcodes) {
-      school.qrcodes = [];
-    }
+    school.qrcodes = [];
 
-    school.qrcodes.push({ qrCode1, qrCode2 });
+    school.qrcodes.push({ tempQr, qrCode2 });
 
     res.json({
       qrCode1,
       qrCode2,
     });
 
-    console.log(
-      `QR codes generated for user ${user.id} in school ${schoolId}.`
-    );
+    console.log(`QR codes generated for user in school ${schoolId}.`);
   } catch (error) {
     console.error("Error generating QR codes:", error);
     res.status(500).send("Error generating QR codes");
@@ -65,11 +49,11 @@ exports.processQRCode = async (req, res) => {
 
     for (const [key, value] of Object.entries(memory)) {
       const foundQR = value.qrcodes.find(
-        (qr) => qr.qrCode1 === qrCode || qr.qrCode2 === qrCode
+        (qr) => qr.tempQr === qrCode || qr.qrCode2 === qrCode
       );
       if (foundQR) {
         schoolId = key;
-        if (foundQR.qrCode1 === qrCode) {
+        if (foundQR.tempQr === qrCode) {
           isFirstQRCode = true;
         }
         break;
@@ -81,14 +65,23 @@ exports.processQRCode = async (req, res) => {
     }
 
     const school = memory[schoolId];
-    const newUser = {
-      id: uuidv4(),
-      nickname,
-      websocket: "",
-      isPaused: false,
-      screenOwner: "selfScreen",
-    };
-    school.users.push(newUser);
+
+    const existingUser = school.users.find((u) => u.nickname === nickname);
+    let newUser = {};
+    if (!existingUser) {
+      newUser = {
+        id: uuidv4(),
+        nickname,
+        websocket: null,
+        isPaused: false,
+        screenOwner: "selfScreen",
+        start: false,
+        state: null,
+      };
+      school.users.push(newUser);
+    } else {
+      newUser = existingUser;
+    }
 
     if (isFirstQRCode) {
       const teacher = school.users.find((user) => user.nickname === "teacher");
@@ -97,7 +90,7 @@ exports.processQRCode = async (req, res) => {
         teacher.websocket &&
         teacher.websocket.readyState === WebSocket.OPEN
       ) {
-        teacher.websocket.send(JSON.stringify({ type: "newUser", nickname }));
+        teacher.websocket.send(JSON.stringify({ type: "newUser", newUser }));
       } else {
         console.error("Teacher websocket is not open or not available.");
       }

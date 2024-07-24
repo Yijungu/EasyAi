@@ -6,14 +6,18 @@ import TeacherLoginScreen from '../screens/TeacherLoginScreen';
 import ChildLoginScreen from '../screens/ChildLoginScreen';
 import MainScreen from '../screens/MainScreen';
 import ModeSelectionScreen from '../screens/ModeSelectionScreen';
+import ScreenShareScreen from '../screens/ScreenShareScreen';
+import ScreenShareManagerScreen from '../screens/ScreenShareManagerScreen'; // 추가된 스크린
+import LibraryScreen from '../screens/LibraryScreen'; // 도서관 스크린 추가
+import SetModeLoadingScreen from '../screens/SetModeLoadingScreen';
 import {WebSocketProvider} from '../contexts/WebSocketContext';
 
 const Stack = createStackNavigator();
 
 const AppNavigator = () => {
   return (
-    <WebSocketProvider>
-      <NavigationContainer>
+    <NavigationContainer>
+      <WebSocketProvider>
         <Stack.Navigator initialRouteName="LoginSelection">
           <Stack.Screen
             name="LoginSelection"
@@ -40,9 +44,29 @@ const AppNavigator = () => {
             component={ModeSelectionScreen}
             options={{headerShown: false}}
           />
+          <Stack.Screen
+            name="SetModeLoading"
+            component={SetModeLoadingScreen}
+            options={{headerShown: false}}
+          />
+          <Stack.Screen
+            name="ScreenShare"
+            component={ScreenShareScreen}
+            options={{headerShown: false}}
+          />
+          <Stack.Screen
+            name="ScreenShareManager"
+            component={ScreenShareManagerScreen}
+            options={{headerShown: false}}
+          />
+          <Stack.Screen
+            name="Library"
+            component={LibraryScreen}
+            options={{headerShown: false}}
+          />
         </Stack.Navigator>
-      </NavigationContainer>
-    </WebSocketProvider>
+      </WebSocketProvider>
+    </NavigationContainer>
   );
 };
 

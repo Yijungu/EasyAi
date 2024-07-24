@@ -15,11 +15,15 @@ import {useWebSocket} from '../contexts/WebSocketContext';
 import {handleChildLogin} from '../services/api';
 
 const ChildLoginScreen = ({navigation}) => {
-  const [nickname, setNickname] = useState('');
+  const [nickname, setNickname] = useState('dlwnsrn');
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [qrCode, setQrCode] = useState('');
   const [affiliation, setAffiliation] = useState('');
-  const {status} = useWebSocket();
+  const {
+    status,
+    setAffiliation: setWsAffiliation,
+    setNickname: setWsNickname,
+  } = useWebSocket();
   const devices = useCameraDevices();
   const device = devices.back;
 
@@ -67,9 +71,14 @@ const ChildLoginScreen = ({navigation}) => {
 
   const handleLogin = async () => {
     try {
-      const data = await handleChildLogin(qrCode, nickname);
+      setNickname(nickname);
+      setWsNickname(nickname);
+      const data = await handleChildLogin('1', nickname);
       setAffiliation(data.schoolId);
+      setWsAffiliation(data.schoolId);
+      setWsNickname(nickname);
       setIsModalVisible(false);
+      navigation.navigate('SetModeLoading');
     } catch (error) {
       Alert.alert('Error', `Error processing QR Code: ${error.message}`);
     }
@@ -86,6 +95,13 @@ const ChildLoginScreen = ({navigation}) => {
           frameProcessorFps={5}
         />
       )}
+      <TextInput
+        style={styles.input}
+        placeholder="Enter Nickname"
+        value={nickname}
+        onChangeText={setNickname}
+      />
+      <Button title="입력 완료" onPress={handleLogin} />
       <Text style={styles.centerText}>QR 코드를 스캔하세요</Text>
       <Modal visible={isModalVisible} transparent={true} animationType="slide">
         <View style={styles.modalContainer}>
