@@ -6,13 +6,15 @@ import {useWebSocket} from '../contexts/WebSocketContext';
 
 const TeacherLoginScreen = ({navigation}) => {
   const [email, setEmail] = useState('teacher@example.com');
-  const {setNewUsers, setAffiliation, setNickname} = useWebSocket();
+  const {setNewUsers, setAffiliation, setNickname, affiliationId} =
+    useWebSocket();
 
   const handleLogin = async () => {
     try {
       setNickname('teacher');
       const data = await login(email);
       setAffiliation(data.affiliation);
+      affiliationId.current = data.affiliationId;
       setNewUsers(data.newUsers);
       navigation.navigate('Main', {email, affiliation: data.affiliation});
     } catch (error) {

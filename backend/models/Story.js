@@ -1,9 +1,12 @@
 const mongoose = require("mongoose");
 
 const StorySchema = new mongoose.Schema({
-  story_id: { type: Number, required: true, unique: true },
-  user_id: { type: Number, required: true, ref: "User" },
-  title: { type: String, required: true },
+  user_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: true,
+    ref: "User",
+  },
+  title: { type: String },
   author: { type: String, required: true },
   publication_status: { type: String, required: true },
   question_depth: { type: String, required: true },

@@ -5,6 +5,8 @@ const {
   broadcastMessage,
   broadcastMessageIn,
 } = require("../services/userService");
+const Story = require("../models/Story");
+const Protagonist = require("../models/Protagonist");
 
 exports.handleConnection = (ws, request) => {
   const urlParts = request.url.split("/");
@@ -74,7 +76,14 @@ exports.handleMessage = (school, userId, data) => {
     case "completed":
       handleCompleted(school, userId, data);
       break;
-      console.error(`Unknown message type: ${data.type}`);
+    case "librarySetting":
+      handleLibrarySetting(school, userId, data.affiliationId);
+      break;
+    case "creatingBook":
+      handleCreatingBook(school, userId, data);
+      break;
+    default:
+      console.error(`Unknown message type (backend): ${data.type}`);
       break;
   }
 };
@@ -108,7 +117,6 @@ exports.handleClose = (school, userId) => {
       // 유효한 웹소켓을 가진 사용자에게만 메시지를 전송
       broadcastMessage(school, message);
     }
-    console.log("memory : ", memory);
   } else {
     console.error(`User with ID ${userId} not found in school.`);
   }
@@ -227,7 +235,7 @@ function setMode(school, mode, newUsers) {
           targetIds.push(user.id);
         }
       });
-      teacher.start = false;
+      teacher.start = targetIds.length > 0 ? false : true;
       teacher.state = "personal";
       sendToUser(school, teacher.id, {
         type: "mode",
@@ -237,6 +245,10 @@ function setMode(school, mode, newUsers) {
         targetIds,
         mode,
       });
+      const allStarted = school.users.every((user) => user.start === true);
+      if (allStarted) {
+        sendStartSignalToAllUsers(school);
+      }
     }
   }
 
@@ -330,4 +342,64 @@ function handleStopShareScreen(school, userId, data) {
   };
 
   sendToUser(school, data.targetId, message);
+}
+
+async function handleLibrarySetting(school, userId, affiliationId) {
+  try {
+    const stories = await Story.find({ user_id: affiliationId });
+    // 주인공 데이터를 가져오기 위한 Promise 배열 생성
+    const storiesWithProtagonists = await Promise.all(
+      stories.map(async (story) => {
+        const protagonists = await Protagonist.find({
+          story_id: story._id,
+        });
+        return { ...story.toObject(), protagonists };
+      })
+    );
+
+    // 조회한 스토리들과 주인공들을 웹소켓을 통해 프론트엔드로 전송합니다.
+    const message = {
+      type: "libraryStart",
+      stories: storiesWithProtagonists, // 조회한 스토리들과 주인공들을 포함합니다.
+    };
+    sendToUser(school, userId, message);
+  } catch (error) {
+    console.error("Error fetching stories or protagonists:", error);
+  }
+}
+
+async function handleCreatingBook(school, userId, data) {
+  try {
+    // Extract relevant data from the input
+    const author = school.users.find((user) => user.id === userId);
+    if (author.teamId) {
+      const team = school.teams.find((team) => team.teamId === user.teamId);
+      authorNickname = team.teamName;
+    } else {
+      authorNickname = author.nickname;
+    }
+    const newStory = new Story({
+      user_id: data.affiliationId,
+      title: null,
+      author: authorNickname,
+      publication_status: false,
+      question_depth: data.depth,
+      question_count: data.questionCount,
+      question_extension_enabled: data.extensionEnabled,
+    });
+
+    // Save the new story to the database
+    const savedStory = await newStory.save();
+
+    // Create a message to send to the user
+    const message = {
+      type: "creatingBook",
+      story: savedStory, // Include the saved story, which contains the _id
+    };
+
+    // Send the message to the user
+    sendToUser(school, userId, message);
+  } catch (error) {
+    console.error("Error creating and saving the story:", error);
+  }
 }

@@ -45,6 +45,7 @@ exports.teacherLogin = async (req, res) => {
 
     res.status(200).json({
       message: "Login successful",
+      affiliationId: user._id,
       affiliation,
       newUsers, // newUsers 배열을 응답에 포함
     });

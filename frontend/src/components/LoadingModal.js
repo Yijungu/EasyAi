@@ -2,24 +2,25 @@ import React, {useEffect, useRef} from 'react';
 import {
   View,
   Text,
-  Modal,
   Animated,
   StyleSheet,
   Image,
+  Modal,
   TouchableOpacity,
 } from 'react-native';
-import Easing from 'react-native/Libraries/Animated/Easing'; // Import Easing
+import LogoLeftTop from '../components/LogoLeftTop';
+import Title from '../components/Title';
 import Loading1 from '../../assets/Loading/Loading_1.png';
 
 const LoadingModal = ({visible, onClose}) => {
   const rotationValue = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
     const startRotation = () => {
       Animated.loop(
         Animated.timing(rotationValue, {
           toValue: 1,
-          duration: 1000,
-          easing: Easing.linear, // Use linear easing for constant speed
+          duration: 1500,
           useNativeDriver: true,
         }),
       ).start();
@@ -35,12 +36,14 @@ const LoadingModal = ({visible, onClose}) => {
 
   return (
     <Modal
-      transparent={true}
       visible={visible}
+      transparent={true}
       animationType="fade"
       onRequestClose={onClose}>
-      <View style={styles.modalBackground}>
-        <View style={styles.modalContainer}>
+      <View style={styles.overlay}>
+        <View style={styles.container}>
+          <LogoLeftTop />
+          <Title>잠시만 기다려주세요.</Title>
           <Animated.Image
             source={Loading1}
             style={[styles.image, {transform: [{rotate: rotation}]}]}
@@ -59,35 +62,38 @@ const LoadingModal = ({visible, onClose}) => {
 };
 
 const styles = StyleSheet.create({
-  modalBackground: {
+  overlay: {
     flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent background
   },
-  modalContainer: {
-    width: 250,
-    padding: 20,
+  container: {
     backgroundColor: '#FBE3C7',
+    padding: 16,
     borderRadius: 10,
     alignItems: 'center',
   },
   image: {
     width: 100,
     height: 100,
+    marginBottom: 30,
+  },
+  title: {
+    fontSize: 18,
     marginBottom: 20,
   },
   description: {
-    fontSize: 16,
+    fontSize: 25,
+    marginBottom: 30,
     textAlign: 'center',
     fontWeight: 'bold',
     color: '#000',
   },
   closeButton: {
     marginTop: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    backgroundColor: '#FFA726',
+    padding: 10,
+    backgroundColor: '#FF6F61',
     borderRadius: 5,
   },
   closeButtonText: {

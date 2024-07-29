@@ -15,11 +15,11 @@ import {
 import {useNavigation} from '@react-navigation/native';
 
 const WebSocketContext = createContext(null);
-// console.log(REACT_APP_WS_URL);
-console.log('123123', REACT_APP_WS_URL);
+console.log('13', REACT_APP_WS_URL);
 
 export const WebSocketProvider = ({children}) => {
   const [status, setStatus] = useState('');
+  // const [affiliationId, setAffiliationId] = useState(null);
   const [affiliation, setAffiliation] = useState('');
   const [qrCodes, setQrCodes] = useState({qrCode1: '', qrCode2: ''});
   const [mode, setMode] = useState('');
@@ -30,10 +30,13 @@ export const WebSocketProvider = ({children}) => {
   const [start, setStart] = useState(false);
   const [loadingModalVisible, setLoadingModalVisible] = useState(false);
   const ws = useRef(null);
+  const affiliationId = useRef(null);
   const localStream = useRef(null);
   const peerConnections = useRef({});
   const navigation = useNavigation();
   const [connectedPeers, setConnectedPeers] = useState({});
+  const [stories, setStories] = useState([]);
+  const [currentStory, setCurrentStory] = useState([]);
 
   const configuration = {
     iceServers: [
@@ -90,7 +93,8 @@ export const WebSocketProvider = ({children}) => {
                 await initializePeerConnections(teamLeaderIds);
               }
             }
-            if (data.sharing) {
+            if (data.sharing && data.targetIds.length > 0) {
+              console.log(data.targetIds.length);
               startScreenSharing(data.targetIds);
             }
             break;
@@ -124,8 +128,14 @@ export const WebSocketProvider = ({children}) => {
           case 'userDisconnected':
             handleUserDisconnected(data.userId);
             break;
+          case 'libraryStart':
+            handleLibraryStart(data.stories);
+            break;
+          case 'creatingBook':
+            handleCreatingBook(data.story);
+            break;
           default:
-            console.warn(`Unknown message type: ${data.type}`);
+            console.warn(`Unknown message type (frontend): ${data.type}`);
         }
       };
       ws.current.onclose = () => {
@@ -219,55 +229,8 @@ export const WebSocketProvider = ({children}) => {
     }
   };
 
-  // const startScreenSharingOnly = async targetId => {
-  //   try {
-  //     const stream = await mediaDevices.getDisplayMedia({video: true});
-  //     localStream.current = stream;
-  //     if (!peerConnections.current[targetId]) {
-  //       peerConnections.current[targetId] = createPeerConnection(targetId);
-  //     }
-
-  //     const pc = peerConnections.current[targetId];
-  //     localStream.current.getTracks().forEach(track => {
-  //       pc.addTrack(track, localStream.current);
-  //     });
-
-  //     const offer = await pc.createOffer();
-  //     const previousOffer = pc.localDescription;
-
-  //     if (previousOffer) {
-  //       const previousSDP = previousOffer.sdp.split('\r\n');
-  //       const newSDP = offer.sdp.split('\r\n');
-  //       const mLineIndices = [];
-
-  //       previousSDP.forEach((line, index) => {
-  //         if (line.startsWith('m=')) {
-  //           mLineIndices.push(index);
-  //         }
-  //       });
-
-  //       mLineIndices.forEach((index, i) => {
-  //         newSDP[index] = previousSDP[index];
-  //       });
-
-  //       offer.sdp = newSDP.join('\r\n');
-  //     }
-
-  //     await pc.setLocalDescription(offer);
-  //     ws.current.send(
-  //       JSON.stringify({
-  //         type: 'offer',
-  //         offer: pc.localDescription,
-  //         targetType: targetId,
-  //       }),
-  //     );
-  //   } catch (error) {
-  //     console.error('Error starting screen share:', error);
-  //     setStatus(`Error starting screen share: ${error.message}`);
-  //   }
-  // };
-
   const stopScreenSharingOnlyReciver = (senderId, newUserId) => {
+    //로딩창 띄움
     const pc = peerConnections.current[senderId];
     console.log(senderId);
     if (pc) {
@@ -581,7 +544,14 @@ export const WebSocketProvider = ({children}) => {
       if (state === 'manage') {
         navigation.navigate('ScreenShareManager');
       } else if (state === 'personal') {
-        navigation.navigate('Library');
+        console.log('affiliationId : ', affiliationId.current);
+        ws.current.send(
+          JSON.stringify({
+            type: 'librarySetting',
+            affiliationId: affiliationId.current,
+          }),
+        );
+        // navigation.navigate('Library');
       } else if (state === 'shared') {
         navigation.navigate('ScreenShare');
       }
@@ -629,6 +599,33 @@ export const WebSocketProvider = ({children}) => {
     }
   };
 
+  const handleLibraryStart = stories => {
+    // Check if the disconnected user is the teacher
+    setStories(stories);
+    navigation.navigate('Library');
+  };
+
+  const creatingBook = (depth, questionCount, extensionEnabled) => {
+    setLoadingModalVisible(true);
+    ws.current.send(
+      JSON.stringify({
+        type: 'creatingBook',
+        affiliationId: affiliationId.current,
+        depth,
+        questionCount,
+        extensionEnabled,
+      }),
+    );
+  };
+
+  const handleCreatingBook = story => {
+    // Check if the disconnected user is the teacher
+    setCurrentStory(story);
+    setLoadingModalVisible(false);
+    console.log(11111);
+    navigation.navigate('ProtagonistDrawing');
+  };
+
   return (
     <WebSocketContext.Provider
       value={{
@@ -647,6 +644,10 @@ export const WebSocketProvider = ({children}) => {
         remoteStreams,
         teams,
         screenShareManage,
+        affiliationId,
+        stories,
+        creatingBook,
+        loadingModalVisible,
       }}>
       {children}
     </WebSocketContext.Provider>

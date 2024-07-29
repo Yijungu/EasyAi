@@ -1,7 +1,7 @@
 import {REACT_APP_API_URL} from '@env';
 
 // console.log(REACT_APP_API_URL);
-console.log('1231231234 ', REACT_APP_API_URL);
+console.log('12 ', REACT_APP_API_URL);
 
 export const login = async email => {
   try {

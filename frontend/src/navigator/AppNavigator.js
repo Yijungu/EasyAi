@@ -10,7 +10,10 @@ import ScreenShareScreen from '../screens/ScreenShareScreen';
 import ScreenShareManagerScreen from '../screens/ScreenShareManagerScreen'; // 추가된 스크린
 import LibraryScreen from '../screens/LibraryScreen'; // 도서관 스크린 추가
 import SetModeLoadingScreen from '../screens/SetModeLoadingScreen';
+import CanvasLoadingScreen from '../screens/CanvasLoadingScreen';
 import {WebSocketProvider} from '../contexts/WebSocketContext';
+import BookCreationScreen from '../screens/BookCreationScreen';
+import ProtagonistDrawingScreen from '../screens/ProtagonistDrawingScreen';
 
 const Stack = createStackNavigator();
 
@@ -62,6 +65,21 @@ const AppNavigator = () => {
           <Stack.Screen
             name="Library"
             component={LibraryScreen}
+            options={{headerShown: false}}
+          />
+          <Stack.Screen
+            name="CanvasLoading"
+            component={CanvasLoadingScreen}
+            options={{headerShown: false}}
+          />
+          <Stack.Screen
+            name="BookCreation"
+            component={BookCreationScreen}
+            options={{headerShown: false}}
+          />
+          <Stack.Screen
+            name="ProtagonistDrawing"
+            component={ProtagonistDrawingScreen}
             options={{headerShown: false}}
           />
         </Stack.Navigator>
