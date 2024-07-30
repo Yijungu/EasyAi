@@ -14,6 +14,7 @@ import CanvasLoadingScreen from '../screens/CanvasLoadingScreen';
 import {WebSocketProvider} from '../contexts/WebSocketContext';
 import BookCreationScreen from '../screens/BookCreationScreen';
 import ProtagonistDrawingScreen from '../screens/ProtagonistDrawingScreen';
+import ProtagonistCreatingScreen from '../screens/ProtagonistCreatingScreen';
 
 const Stack = createStackNavigator();
 
@@ -21,7 +22,7 @@ const AppNavigator = () => {
   return (
     <NavigationContainer>
       <WebSocketProvider>
-        <Stack.Navigator initialRouteName="LoginSelection">
+        <Stack.Navigator initialRouteName="ProtagonistCreating">
           <Stack.Screen
             name="LoginSelection"
             component={LoginSelectionScreen}
@@ -80,6 +81,11 @@ const AppNavigator = () => {
           <Stack.Screen
             name="ProtagonistDrawing"
             component={ProtagonistDrawingScreen}
+            options={{headerShown: false}}
+          />
+          <Stack.Screen
+            name="ProtagonistCreating"
+            component={ProtagonistCreatingScreen}
             options={{headerShown: false}}
           />
         </Stack.Navigator>
