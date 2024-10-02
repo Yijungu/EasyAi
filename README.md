@@ -36,7 +36,8 @@
 - **화면 공유 기능 개발**: **WebRTC**를 활용해 다양한 모드에서의 화면 공유 기능을 구현 완료.
 - **UI/UX 설계**: 어린이와 선생님 모두를 위한 직관적이고 친근한 사용자 인터페이스 설계 및 구현 완료.
 
-### 구조 & 디자인 https://www.figma.com/design/xRPr8kbUErmynKYOHpt4s6/EASY-AI?node-id=0-1&t=Y1L1bCRtc7gsEUe0-1
+### 구조 & 디자인 
+- https://www.figma.com/design/xRPr8kbUErmynKYOHpt4s6/EASY-AI?node-id=0-1&t=Y1L1bCRtc7gsEUe0-1
 
 ## 사용 기술
 - **언어**: JavaScript
