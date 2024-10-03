@@ -4,7 +4,7 @@
 
 <div style="display: flex;">
     <img width="365" alt="image" src="https://github.com/user-attachments/assets/9fadf05f-5c6c-4502-a1f9-8ee552183741">
-    <img width="369" alt="image" src="https://github.com/user-attachments/assets/71039a16-4b39-41cb-a854-1f0124d672f3">
+    <img width="365" alt="image" src="https://github.com/user-attachments/assets/71039a16-4b39-41cb-a854-1f0124d672f3">
 </div>
 
 ## 개요
